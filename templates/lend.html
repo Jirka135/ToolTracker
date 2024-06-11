@@ -4,32 +4,6 @@
 
 {% block content %}
     <h1 class="mt-5">Lend Tool</h1>
-
-    <!-- QR Code Scanner Section -->
-    <button type="button" class="btn btn-secondary mt-3" data-toggle="modal" data-target="#qrModal">
-        Scan QR Code to Lend Tool
-    </button>
-
-    <!-- QR Code Scanner Modal -->
-    <div class="modal fade" id="qrModal" tabindex="-1" role="dialog" aria-labelledby="qrModalLabel" aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="qrModalLabel">Scan QR Code</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <div id="qr-reader" style="width:100%"></div>
-                    <form id="qr-form" method="POST" action="{{ url_for('lend_qr') }}">
-                        <input type="hidden" id="qr_data" name="qr_data">
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <form method="POST" class="mt-3">
         <div class="form-group">
             <label for="tool_id">Tool:</label>
@@ -49,24 +23,79 @@
         {% endfor %}
     </ul>
 
-    <script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
+    <h2 class="mt-5">Scan QR Code to Lend Tool</h2>
+    <button id="scanBtn" class="btn btn-secondary mt-3">Scan QR Code</button>
+    <div id="qrScanner" style="display:none;">
+        <video id="video" class="mt-3" width="300" height="300" style="border: 1px solid black;" autoplay></video>
+        <div id="result" class="mt-3">No QR code detected yet.</div>
+        <div id="debug" class="mt-3"></div>
+    </div>
+    <form method="POST" action="{{ url_for('lend_qr') }}" id="qrForm" style="display:none;">
+        <input type="hidden" name="qr_data" id="qr_data">
+        <button type="submit" class="btn btn-primary mt-3">Lend Tool via QR</button>
+    </form>
+
+    <script src="https://cdn.jsdelivr.net/npm/qr-scanner/qr-scanner.min.js"></script>
     <script>
-        function onScanSuccess(decodedText, decodedResult) {
-            document.getElementById('qr_data').value = decodedText;
-            document.getElementById('qr-form').submit();
+        const scanBtn = document.getElementById('scanBtn');
+        const qrScannerDiv = document.getElementById('qrScanner');
+        const videoElem = document.getElementById('video');
+        const resultElem = document.getElementById('result');
+        const debugElem = document.getElementById('debug');
+        const qrForm = document.getElementById('qrForm');
+        const qrDataInput = document.getElementById('qr_data');
+        let qrScanner;
+
+        scanBtn.addEventListener('click', () => {
+            qrScannerDiv.style.display = 'block';
+            startScanner();
+        });
+
+        function startScanner() {
+            qrScanner = new QrScanner(videoElem, result => {
+                console.log('decoded qr code:', result);
+                resultElem.textContent = `QR Code Result: ${result}`;
+                qrDataInput.value = result;
+                qrForm.style.display = 'block';
+                qrScanner.stop();
+            }, {
+                onDecodeError: error => {
+                    console.error('QR scanner decode error:', error);
+                    resultElem.textContent = `Decode Error: ${error}`;
+                },
+                highlightScanRegion: true,
+            });
+
+            qrScanner.start().then(() => {
+                console.log('QR scanner started');
+            }).catch(error => {
+                console.error('QR scanner start error:', error);
+                resultElem.textContent = `Error: ${error.message}`;
+            });
+
+            // Optional: Log errors
+            qrScanner.$canvas.addEventListener('error', (error) => {
+                console.error('QR scanner canvas error:', error);
+            });
+
+            qrScanner.onDecode = result => {
+                debugElem.textContent = `Continuous decode: ${result}`;
+            };
         }
 
-        // Ensure the scanner is initialized only when the modal is shown
-        $('#qrModal').on('shown.bs.modal', function () {
-            var html5QrcodeScanner = new Html5QrcodeScanner(
-                "qr-reader", { fps: 10, qrbox: 250 });
-            html5QrcodeScanner.render(onScanSuccess);
-        });
-
-        // Ensure the scanner is cleared when the modal is hidden
-        $('#qrModal').on('hidden.bs.modal', function () {
-            var qrReader = document.getElementById('qr-reader');
-            qrReader.innerHTML = "";
-        });
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: "environment" } } })
+                .then(stream => {
+                    videoElem.srcObject = stream;
+                    videoElem.play();
+                })
+                .catch(error => {
+                    console.error('Error accessing camera:', error);
+                    resultElem.textContent = `Error accessing camera: ${error.message}`;
+                });
+        } else {
+            console.error('getUserMedia not supported');
+            resultElem.textContent = 'Error: getUserMedia not supported by this browser.';
+        }
     </script>
 {% endblock %}

@@ -55,13 +55,15 @@ with app.app_context():
     db.create_all()
 
 def run_flask_app():
-    app.run(host='0.0.0.0', port=5000,debug=True, use_reloader=False)
+    context = ('C:\\Users\\Jirka\\VScode\\ToolTracker\\certs\\certificate.pem', 'C:\\Users\\Jirka\\VScode\\ToolTracker\\certs\\key.pem')
+    app.run(debug=True, ssl_context=context, host='0.0.0.0', port=5000)
 
 def shutdown_server():
     func = request.environ.get('werkzeug.server.shutdown')
     if func is None:
         raise RuntimeError('Not running with the Werkzeug Server')
     func()
+    print("Server is shutting down...")
 
 def generate_qr_code(data):
     qr = qrcode.QRCode(
@@ -130,6 +132,21 @@ def list_auth_users():
     users = AuthUser.query.all()
     for user in users:
         print(f"User ID: {user.id}, Username: {user.username}")
+
+def add_user(name, password):
+    if User.query.filter_by(name=name).first():
+        print('Username already exists.')
+        return
+    new_user = User(name=name)
+    new_user.set_password(password)
+    db.session.add(new_user)
+    db.session.commit()
+    print(f"User '{name}' added.")
+
+def list_users():
+    users = User.query.all()
+    for user in users:
+        print(f"User ID: {user.id}, Name: {user.name}")
 
 def identify_tool_from_qr_code(file_path):
     img = cv2.imread(file_path)
@@ -288,57 +305,63 @@ def add_test_data():
     print("Test data added: 3 users and 10 tools.")
 
 if __name__ == '__main__':
-    # Run Flask app in a separate thread
-    flask_thread = threading.Thread(target=run_flask_app)
-    flask_thread.start()
+    # Function to run the console-based tool management system
+    def run_console():
+        try:
+            with app.app_context():
+                while True:
+                    print("\nTool Management System")
+                    print("1. Add Tool")
+                    print("2. Remove Tool")
+                    print("3. List Tools")
+                    print("4. Add User")
+                    print("5. Remove User")
+                    print("6. List Users")
+                    print("7. Identify Tool")
+                    print("8. Add Auth User")
+                    print("9. List Auth Users")
+                    print("10. Exit")
+                    choice = input("Enter your choice: ")
 
-    with app.app_context():
-        pass
-        #add_test_data()
+                    if choice == '1':
+                        name = input("Enter tool name: ")
+                        add_tool(name)
+                    elif choice == '2':
+                        tool_id = int(input("Enter tool ID to remove: "))
+                        remove_tool(tool_id)
+                    elif choice == '3':
+                        list_tools()
+                    elif choice == '4':
+                        name = input("Enter user name: ")
+                        password = input("Enter password: ")
+                        add_user(name, password)
+                    elif choice == '5':
+                        user_id = int(input("Enter user ID to remove: "))
+                        remove_user(user_id)
+                    elif choice == '6':
+                        list_users()
+                    elif choice == '7':
+                        filename = input("Enter QR code filename: ")
+                        file_path = os.path.join('static', 'qr_codes', filename)
+                        print(f"Reading QR code from: {file_path}")
+                        identify_tool_from_qr_code(file_path)
+                    elif choice == '8':
+                        username = input("Enter username: ")
+                        password = input("Enter password: ")
+                        add_auth_user(username, password)
+                    elif choice == '9':
+                        list_auth_users()
+                    elif choice == '10':
+                        shutdown_server()
+                        break
+                    else:
+                        print("Invalid choice. Please try again.")
+        except KeyboardInterrupt:
+            shutdown_server()
 
-    # Console-based tool management system
-    try:
-        with app.app_context():
-            while True:
-                print("\nTool Management System")
-                print("1. Add Tool")
-                print("2. Remove Tool")
-                print("3. List Tools")
-                print("4. Add Auth User")
-                print("5. Remove User")
-                print("6. List Auth Users")
-                print("7. Identify Tool")
-                print("8. Exit")
-                choice = input("Enter your choice: ")
+    # Start the console-based tool management system in a separate thread
+    console_thread = threading.Thread(target=run_console)
+    console_thread.start()
 
-                if choice == '1':
-                    name = input("Enter tool name: ")
-                    add_tool(name)
-                elif choice == '2':
-                    tool_id = int(input("Enter tool ID to remove: "))
-                    remove_tool(tool_id)
-                elif choice == '3':
-                    list_tools()
-                elif choice == '4':
-                    username = input("Enter username: ")
-                    password = input("Enter password: ")
-                    add_auth_user(username, password)
-                elif choice == '5':
-                    user_id = int(input("Enter user ID to remove: "))
-                    remove_user(user_id)
-                elif choice == '6':
-                    list_auth_users()
-                elif choice == '7':
-                    filename = input("Enter QR code filename: ")
-                    file_path = os.path.join('static', 'qr_codes', filename)
-                    print(f"Reading QR code from: {file_path}")
-                    identify_tool_from_qr_code(file_path)
-                elif choice == '8':
-                    shutdown_server()
-                    flask_thread.join()
-                    break
-                else:
-                    print("Invalid choice. Please try again.")
-    except KeyboardInterrupt:
-        shutdown_server()
-        flask_thread.join()
+    # Run the Flask app in the main thread
+    run_flask_app()
