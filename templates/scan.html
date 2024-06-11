@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Scan QR Code{% endblock %}
+
+{% block content %}
+    <h1 class="mt-5">Scan QR Code</h1>
+    <div id="qr-reader" style="width:500px; margin-top: 20px;"></div>
+    <form id="qr-form" method="POST" action="{{ url_for('lend_qr') }}">
+        <input type="hidden" id="qr_data" name="qr_data">
+        <button type="submit" class="btn btn-primary mt-3">Lend Tool</button>
+    </form>
+    <form id="return-qr-form" method="POST" action="{{ url_for('return_qr') }}">
+        <input type="hidden" id="qr_data_return" name="qr_data">
+        <button type="submit" class="btn btn-primary mt-3">Return Tool</button>
+    </form>
+    <script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
+    <script>
+        function onScanSuccess(decodedText, decodedResult) {
+            document.getElementById('qr_data').value = decodedText;
+            document.getElementById('qr_data_return').value = decodedText;
+        }
+
+        var html5QrcodeScanner = new Html5QrcodeScanner(
+            "qr-reader", { fps: 10, qrbox: 250 });
+        html5QrcodeScanner.render(onScanSuccess);
+    </script>
+{% endblock %}
