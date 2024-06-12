@@ -26,6 +26,11 @@
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('inventory') }}">Inventory</a>
                 </li>
+                {% if session.get('user_id') and is_admin(session['user_id']) %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('admin_panel') }}">Admin Panel</a>
+                </li>
+                {% endif %}
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
                 </li>

@@ -3,12 +3,14 @@ from flask_sqlalchemy import SQLAlchemy
 import qrcode
 import os
 import cv2
+from sqlalchemy.schema import MetaData
 from pyzbar.pyzbar import decode
 import random
 import string
 import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 import threading
+import sqlite3
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'supersecretkey'
@@ -26,13 +28,13 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(120), nullable=False)
+    is_admin = db.Column(db.Boolean, default=False)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
-
 
 class Transaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -49,6 +51,25 @@ def shutdown_server():
     if func is None:
         raise RuntimeError('Not running with the Werkzeug Server')
     func()
+
+def backup_database():
+    backup_dir = 'backups'
+    os.makedirs(backup_dir, exist_ok=True)
+    backup_file = os.path.join(backup_dir, f'database_backup_{datetime.datetime.now().strftime("%Y%m%d%H%M%S")}.db')
+    conn = sqlite3.connect(app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', ''))
+    with open(backup_file, 'wb') as f:
+        for line in conn.iterdump():
+            f.write(f'{line}\n'.encode('utf-8'))
+    print(f"Backup created at {backup_file}")
+
+def restore_database(backup_file):
+    conn = sqlite3.connect(app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', ''))
+    cursor = conn.cursor()
+    with open(backup_file, 'r') as f:
+        sql = f.read()
+        cursor.executescript(sql)
+    conn.commit()
+    print(f"Database restored from {backup_file}")
 
 def generate_qr_code(tool):
     security_token = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
@@ -118,15 +139,22 @@ def regenerate_qr_codes():
     db.session.commit()
     print("QR codes regenerated for all tools.")
 
-def add_user(username, password):
+def add_user(username, password, is_admin=False):
     if User.query.filter_by(username=username).first():
         print('Username already exists.')
         return
-    user = User(username=username)
+    user = User(username=username, is_admin=is_admin)
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
-    print(f"User '{username}' added.")
+    print(f"User '{username}' added{' as admin' if is_admin else ''}.")
+
+def is_admin(user_id):
+    user = User.query.get(user_id)
+    return user.is_admin if user else False
+
+def add_admin(username, password):
+    add_user(username, password, is_admin=True)
 
 def remove_user(user_id):
     user = User.query.get(user_id)
@@ -290,6 +318,95 @@ def add_test_data():
 
     print("Test data added: 3 users and 10 tools.")
 
+@app.route('/admin_panel')
+def admin_panel():
+    if 'user_id' not in session or not is_admin(session['user_id']):
+        return redirect(url_for('login'))
+    
+    tools = Tool.query.all()
+    users = User.query.all()
+    return render_template('admin_panel.html', tools=tools, users=users)
+
+@app.route('/admin/add_tool', methods=['POST'])
+def admin_add_tool():
+    if 'user_id' not in session or not is_admin(session['user_id']):
+        flash('Admin access required', 'danger')
+        return redirect(url_for('login'))
+    
+    name = request.form['tool_name']
+    location = request.form['tool_location']
+    add_tool(name, location)
+    flash('Tool added successfully', 'success')
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/remove_tool', methods=['POST'])
+def admin_remove_tool():
+    if 'user_id' not in session or not is_admin(session['user_id']):
+        flash('Admin access required', 'danger')
+        return redirect(url_for('login'))
+    
+    tool_id = request.form['tool_id']
+    remove_tool(tool_id)
+    flash('Tool removed successfully', 'success')
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/add_user', methods=['POST'])
+def admin_add_user():
+    if 'user_id' not in session or not is_admin(session['user_id']):
+        flash('Admin access required', 'danger')
+        return redirect(url_for('login'))
+    
+    username = request.form['username']
+    password = request.form['password']
+    add_user(username, password)
+    flash('User added successfully', 'success')
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/remove_user', methods=['POST'])
+def admin_remove_user():
+    if 'user_id' not in session or not is_admin(session['user_id']):
+        flash('Admin access required', 'danger')
+        return redirect(url_for('login'))
+    
+    user_id = request.form['user_id']
+    remove_user(user_id)
+    flash('User removed successfully', 'success')
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/backup_database', methods=['POST'])
+def admin_backup_database():
+    if 'user_id' not in session or not is_admin(session['user_id']):
+        flash('Admin access required', 'danger')
+        return redirect(url_for('login'))
+    
+    backup_database()
+    flash('Database backup created successfully', 'success')
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/restore_database', methods=['POST'])
+def admin_restore_database():
+    if 'user_id' not in session or not is_admin(session['user_id']):
+        flash('Admin access required', 'danger')
+        return redirect(url_for('login'))
+    
+    backup_dir = os.path.join('backups')
+    backups = sorted(os.listdir(backup_dir), reverse=True)
+    if backups:
+        latest_backup = os.path.join(backup_dir, backups[0])
+        restore_database(latest_backup)
+        flash('Database restored successfully', 'success')
+    else:
+        flash('No backup files found', 'danger')
+    return redirect(url_for('admin_panel'))
+
+@app.context_processor
+def utility_processor():
+    def is_admin(user_id):
+        user = User.query.get(user_id)
+        return user.is_admin if user else False
+    return dict(is_admin=is_admin)
+
+
 def run_console():
     try:
         with app.app_context():
@@ -304,7 +421,10 @@ def run_console():
                 print("7. Identify Tool")
                 print("10. Add Test Data")
                 print("11. Regenerate QR Codes")
-                print("12. Exit")
+                print("12. Backup Database")
+                print("13. Restore Database")
+                print("14. Add Admin")
+                print("15. Exit")
                 choice = input("Enter your choice: ")
 
                 if choice == '1':
@@ -335,6 +455,15 @@ def run_console():
                 elif choice == '11':
                     regenerate_qr_codes()
                 elif choice == '12':
+                    backup_database()
+                elif choice == '13':
+                    backup_file = input("Enter the backup file path: ")
+                    restore_database(backup_file)
+                elif choice == '14':
+                    username = input("Enter admin username: ")
+                    password = input("Enter admin password: ")
+                    add_user(username, password, is_admin=True)
+                elif choice == '15':
                     shutdown_server()
                     break
                 else:
@@ -343,8 +472,11 @@ def run_console():
         shutdown_server()
 
 if __name__ == '__main__':
-    console_thread = threading.Thread(target=run_console)
-    console_thread.start()
-
-    context = ('certs/certificate.pem', 'certs/key.pem')
-    app.run(debug=True, ssl_context=context, host='0.0.0.0', port=5000)
+    def run_web_server():
+        context = ('certs/certificate.pem', 'certs/key.pem')
+        app.run(debug=True, ssl_context=context, host='0.0.0.0', port=5000,use_reloader=False)
+    
+    web_thread = threading.Thread(target=run_web_server)
+    web_thread.start()
+    
+    run_console()
