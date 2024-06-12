@@ -1,6 +1,7 @@
 Flask
 Flask-SQLAlchemy
-qrcode
+qrcode[pil]
 opencv-python-headless
 pyzbar
 Werkzeug
+waitress
