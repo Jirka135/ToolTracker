@@ -1,0 +1,6 @@
+Flask
+Flask-SQLAlchemy
+qrcode
+opencv-python-headless
+pyzbar
+Werkzeug
