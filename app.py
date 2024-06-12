@@ -54,16 +54,11 @@ class AuthUser(db.Model):
 with app.app_context():
     db.create_all()
 
-def run_flask_app():
-    context = ('C:\\Users\\Jirka\\VScode\\ToolTracker\\certs\\certificate.pem', 'C:\\Users\\Jirka\\VScode\\ToolTracker\\certs\\key.pem')
-    app.run(debug=True, ssl_context=context, host='0.0.0.0', port=5000)
-
 def shutdown_server():
     func = request.environ.get('werkzeug.server.shutdown')
     if func is None:
         raise RuntimeError('Not running with the Werkzeug Server')
     func()
-    print("Server is shutting down...")
 
 def generate_qr_code(data):
     qr = qrcode.QRCode(
@@ -169,12 +164,6 @@ def index():
                                .all()
     return render_template('index.html', borrowed_items=borrowed_items)
 
-@app.route('/scan', methods=['GET', 'POST'])
-def scan():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    return render_template('scan.html')
-
 @app.route('/lend_qr', methods=['POST'])
 def lend_qr():
     if 'user_id' not in session:
@@ -248,7 +237,7 @@ def lend():
     
     # Get list of tools that are not currently lent out
     lent_out_tools = db.session.query(Transaction.tool_id).filter(Transaction.return_date.is_(None)).subquery()
-    available_tools = Tool.query.filter(Tool.id.notin_(lent_out_tools)).all()
+    available_tools = Tool.query.filter(Tool.id.not_in(lent_out_tools.select())).all()
 
     # Get list of currently borrowed tools
     borrowed_tools = db.session.query(Tool).join(Transaction).filter(Transaction.return_date.is_(None)).all()
@@ -364,4 +353,5 @@ if __name__ == '__main__':
     console_thread.start()
 
     # Run the Flask app in the main thread
-    run_flask_app()
+    context = ('certs/certificate.pem', 'certs/key.pem')
+    app.run(debug=True, ssl_context=context, host='0.0.0.0', port=5000)
