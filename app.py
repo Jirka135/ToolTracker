@@ -172,11 +172,16 @@ def lend_qr():
     qr_data = request.form['qr_data']
     tool = Tool.query.filter_by(name=qr_data).first()
     if tool:
-        user_id = session['user_id']
-        transaction = Transaction(user_id=user_id, tool_id=tool.id, borrow_date=datetime.datetime.utcnow())
-        db.session.add(transaction)
-        db.session.commit()
-        flash('Tool lent successfully', 'success')
+        # Check if the tool is already lent out
+        active_transaction = Transaction.query.filter_by(tool_id=tool.id, return_date=None).first()
+        if active_transaction:
+            flash('Tool is already lent out', 'danger')
+        else:
+            user_id = session['user_id']
+            transaction = Transaction(user_id=user_id, tool_id=tool.id, borrow_date=datetime.datetime.utcnow())
+            db.session.add(transaction)
+            db.session.commit()
+            flash('Tool lent successfully', 'success')
     else:
         flash('Tool not found', 'danger')
     
