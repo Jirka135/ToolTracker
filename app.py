@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, get_flashed_messages
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
 from flask_sqlalchemy import SQLAlchemy
 import qrcode
 import os
@@ -10,12 +10,17 @@ import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 import threading
 import sqlite3
+import zipfile
+from io import BytesIO
+import logging
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'supersecretkey'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+
+LOG_FILE_PATH = 'instance/app.log'
 
 class Tool(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -39,11 +44,30 @@ class Transaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     tool_id = db.Column(db.Integer, db.ForeignKey('tool.id'), nullable=False)
-    borrow_date = db.Column(db.DateTime, nullable=False, default=datetime.datetime.utcnow)
+    borrow_date = db.Column(db.DateTime, nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     return_date = db.Column(db.DateTime, nullable=True)
+
+class ToolLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    tool_id = db.Column(db.Integer, db.ForeignKey('tool.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    action = db.Column(db.String(50), nullable=False)  # e.g., 'borrowed', 'returned', 'maintenance'
+    timestamp = db.Column(db.DateTime, nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    details = db.Column(db.Text, nullable=True)
+    
+    tool = db.relationship('Tool', backref=db.backref('logs', lazy=True))
+    user = db.relationship('User', backref=db.backref('logs', lazy=True))
+    
+    tool = db.relationship('Tool', backref=db.backref('logs', lazy=True))
+    user = db.relationship('User', backref=db.backref('logs', lazy=True))
 
 with app.app_context():
     db.create_all()
+
+def log_tool_action(tool_id, user_id, action, details=None):
+    log_entry = ToolLog(tool_id=tool_id, user_id=user_id, action=action, details=details, timestamp=datetime.datetime.now(datetime.timezone.utc))
+    db.session.add(log_entry)
+    db.session.commit()
 
 def shutdown_server():
     func = request.environ.get('werkzeug.server.shutdown')
@@ -104,7 +128,7 @@ def add_tool(name, location):
     print(f"Tool '{name}' added with QR code.")
 
 def remove_tool(tool_id):
-    tool = Tool.query.get(tool_id)
+    tool = db.session.get(Tool, tool_id)
     if tool:
         db.session.delete(tool)
         db.session.commit()
@@ -123,7 +147,7 @@ def identify_tool_from_qr_code(file_path):
     for obj in decoded_objects:
         qr_data = obj.data.decode('utf-8')
         tool_id = qr_data.split(':')[0]
-        tool = Tool.query.get(tool_id)
+        tool = db.session.get(Tool, tool_id)
         if tool:
             print(f"QR code corresponds to Tool ID: {tool.id}, Name: {tool.name}")
             return tool
@@ -149,14 +173,14 @@ def add_user(username, password, is_admin=False):
     print(f"User '{username}' added{' as admin' if is_admin else ''}.")
 
 def is_admin(user_id):
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     return user.is_admin if user else False
 
 def add_admin(username, password):
     add_user(username, password, is_admin=True)
 
 def remove_user(user_id):
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if user:
         db.session.delete(user)
         db.session.commit()
@@ -169,6 +193,36 @@ def list_users():
     for user in users:
         print(f"User ID: {user.id}, Username: {user.username}")
 
+def logs():
+    os.makedirs(os.path.dirname(LOG_FILE_PATH), exist_ok=True)
+    open(LOG_FILE_PATH, 'a').close()
+    logging.basicConfig(
+        filename=LOG_FILE_PATH, 
+        level=logging.INFO, 
+        format='%(asctime)s %(levelname)s: %(message)s', 
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+
+def log_event(event_type, user_id, tool_id, additional_info=""):
+    user = User.query.get(user_id)
+    tool = Tool.query.get(tool_id)
+    if user and tool:
+        logging.info(f"{event_type}: User {user.username} ({user_id}) - Tool {tool.name} ({tool_id}) {additional_info}")
+    else:
+        logging.warning(f"{event_type}: Invalid user ID {user_id} or tool ID {tool_id}")
+
+def log_lend_tool(user_id, tool_id):
+    log_event("LEND", user_id, tool_id, f"on {datetime.datetime.now(datetime.timezone.utc)}")
+
+def log_return_tool(user_id, tool_id):
+    log_event("RETURN", user_id, tool_id, f"on {datetime.datetime.now(datetime.timezone.utc)}")
+
+@app.route('/logout')
+def logout():
+    session.pop('user_id', None)
+    flash('You have been logged out')
+    return redirect(url_for('login'))
+
 @app.route('/')
 def index():
     borrowed_items = db.session.query(Transaction, Tool, User) \
@@ -178,52 +232,34 @@ def index():
                                .all()
     return render_template('index.html', borrowed_items=borrowed_items)
 
+@app.context_processor
+def utility_processor():
+    def is_admin(user_id):
+        user = db.session.get(User, user_id)
+        return user.is_admin if user else False
+    return dict(is_admin=is_admin)
+
 @app.route('/inventory')
 def inventory():
     tools = Tool.query.all()
     return render_template('inventory.html', tools=tools)
 
-@app.route('/lend_qr', methods=['POST'])
-def lend_qr():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    
-    qr_data = request.form['qr_data']
-    tool = Tool.query.filter_by(name=qr_data).first()
-    if tool:
-        active_transaction = Transaction.query.filter_by(tool_id=tool.id, return_date=None).first()
-        if active_transaction:
-            flash('Tool is already lent out', 'danger')
-        else:
-            user_id = session['user_id']
-            transaction = Transaction(user_id=user_id, tool_id=tool.id, borrow_date=datetime.datetime.utcnow())
-            db.session.add(transaction)
-            db.session.commit()
-            flash('Tool lent successfully', 'success')
-    else:
-        flash('Tool not found', 'danger')
-    
-    return redirect(url_for('lend'))
+@app.route('/admin/live_logs')
+def admin_live_logs():
+    try:
+        with open(LOG_FILE_PATH, 'r') as log_file:
+            log_content = log_file.read()
+        return log_content, 200, {'Content-Type': 'text/plain'}
+    except Exception as e:
+        return str(e), 500
 
-@app.route('/return_qr', methods=['POST'])
-def return_qr():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    
-    qr_data = request.form['qr_data']
-    tool = Tool.query.filter_by(name=qr_data).first()
-    if tool:
-        transaction = Transaction.query.filter_by(tool_id=tool.id, return_date=None).first()
-        if transaction:
-            transaction.return_date = datetime.datetime.utcnow()
-            db.session.commit()
-            flash('Tool returned successfully', 'success')
-        else:
-            flash('No active lending record found for this tool', 'danger')
+@app.route('/admin/download_logs', methods=['POST'])
+def admin_download_logs():
+    if os.path.exists(LOG_FILE_PATH):
+        return send_file(LOG_FILE_PATH, as_attachment=True)
     else:
-        flash('Tool not found', 'danger')
-    
-    return redirect(url_for('return_tool'))
+        flash('Log file not found', 'danger')
+        return redirect(url_for('admin_panel'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -251,12 +287,30 @@ def lend():
         return redirect(url_for('login'))
     
     if request.method == 'POST':
-        tool_id = request.form['tool_id']
+        if 'tool_id' in request.form:
+            tool_id = request.form['tool_id']
+        elif 'qr_data' in request.form:
+            qr_data = request.form['qr_data']
+            tool = Tool.query.filter_by(name=qr_data).first()
+            if tool:
+                tool_id = tool.id
+            else:
+                flash('Tool not found', 'danger')
+                return redirect(url_for('lend'))
+        else:
+            flash('Invalid request', 'danger')
+            return redirect(url_for('lend'))
+        
         user_id = session['user_id']
-        transaction = Transaction(user_id=user_id, tool_id=tool_id, borrow_date=datetime.datetime.utcnow())
-        db.session.add(transaction)
-        db.session.commit()
-        flash('Tool lent successfully', 'success')
+        active_transaction = Transaction.query.filter_by(tool_id=tool_id, return_date=None).first()
+        if active_transaction:
+            flash('Tool is already lent out', 'danger')
+        else:
+            transaction = Transaction(user_id=user_id, tool_id=tool_id, borrow_date=datetime.datetime.now(datetime.timezone.utc))
+            db.session.add(transaction)
+            db.session.commit()
+            log_lend_tool(user_id, tool_id)
+            flash('Tool lent successfully', 'success')
     
     lent_out_tools = db.session.query(Transaction.tool_id).filter(Transaction.return_date.is_(None)).subquery()
     available_tools = Tool.query.filter(Tool.id.not_in(lent_out_tools.select())).all()
@@ -271,51 +325,53 @@ def return_tool():
         return redirect(url_for('login'))
     
     if request.method == 'POST':
-        tool_id = request.form['tool_id']
+        if 'tool_id' in request.form:
+            tool_id = request.form['tool_id']
+        elif 'qr_data' in request.form:
+            qr_data = request.form['qr_data']
+            tool = Tool.query.filter_by(name=qr_data).first()
+            if tool:
+                tool_id = tool.id
+            else:
+                flash('Tool not found', 'danger')
+                return redirect(url_for('return_tool'))
+        else:
+            flash('Invalid request', 'danger')
+            return redirect(url_for('return_tool'))
+        
         transaction = Transaction.query.filter_by(tool_id=tool_id, return_date=None).first()
         if transaction:
-            transaction.return_date = datetime.datetime.utcnow()
+            transaction.return_date = datetime.datetime.now(datetime.timezone.utc)
             db.session.commit()
+            log_return_tool(transaction.user_id, tool_id) 
             flash('Tool returned successfully')
+        else:
+            flash('No active lending record found for this tool', 'danger')
 
     transactions = db.session.query(Transaction, Tool).join(Tool).filter(Transaction.return_date.is_(None)).all()
     borrowed_tools = [transaction.Tool for transaction in transactions]
     
     return render_template('return.html', transactions=transactions, borrowed_tools=borrowed_tools)
 
-@app.route('/logout')
-def logout():
-    session.pop('user_id', None)
-    flash('You have been logged out')
-    return redirect(url_for('login'))
+@app.route('/admin/download_qr_codes')
+def download_qr_codes():
+    # Create a BytesIO object to hold the zip file in memory
+    zip_buffer = BytesIO()
 
-def add_test_data():
-    test_users = [
-        {"username": "Alice", "password": "password1"},
-        {"username": "Bob", "password": "password2"},
-        {"username": "Charlie", "password": "password3"},
-    ]
+    # Create a zip file within the BytesIO object
+    with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+        # Get all tools with QR codes
+        tools = Tool.query.all()
+        for tool in tools:
+            qr_code_path = tool.qr_code
+            if os.path.exists(qr_code_path):
+                zip_file.write(qr_code_path, os.path.basename(qr_code_path))
 
-    test_tools = [
-        {"name": "Hammer", "location": "Drawer 1"},
-        {"name": "Screwdriver", "location": "Drawer 2"},
-        {"name": "Wrench", "location": "Drawer 3"},
-        {"name": "Drill", "location": "Under Desk 1"},
-        {"name": "Saw", "location": "Drawer 4"},
-        {"name": "Pliers", "location": "Drawer 5"},
-        {"name": "Tape Measure", "location": "Drawer 6"},
-        {"name": "Level", "location": "Drawer 7"},
-        {"name": "Chisel", "location": "Drawer 8"},
-        {"name": "Utility Knife", "location": "Under Desk 2"},
-    ]
+    # Rewind the buffer's position to the beginning
+    zip_buffer.seek(0)
 
-    for user in test_users:
-        add_user(user["username"], user["password"])
-
-    for tool in test_tools:
-        add_tool(tool["name"], tool["location"])
-
-    print("Test data added: 3 users and 10 tools.")
+    # Send the zip file to the client
+    return send_file(zip_buffer, mimetype='application/zip', as_attachment=True, download_name='qr_codes.zip')
 
 @app.route('/admin_panel')
 def admin_panel():
@@ -398,13 +454,34 @@ def admin_restore_database():
         flash('No backup files found', 'danger')
     return redirect(url_for('admin_panel'))
 
-@app.context_processor
-def utility_processor():
-    def is_admin(user_id):
-        user = User.query.get(user_id)
-        return user.is_admin if user else False
-    return dict(is_admin=is_admin)
 
+def add_test_data():
+    test_users = [
+        {"username": "Alice", "password": "password1"},
+        {"username": "Bob", "password": "password2"},
+        {"username": "Charlie", "password": "password3"},
+    ]
+
+    test_tools = [
+        {"name": "Hammer", "location": "Drawer 1"},
+        {"name": "Screwdriver", "location": "Drawer 2"},
+        {"name": "Wrench", "location": "Drawer 3"},
+        {"name": "Drill", "location": "Under Desk 1"},
+        {"name": "Saw", "location": "Drawer 4"},
+        {"name": "Pliers", "location": "Drawer 5"},
+        {"name": "Tape Measure", "location": "Drawer 6"},
+        {"name": "Level", "location": "Drawer 7"},
+        {"name": "Chisel", "location": "Drawer 8"},
+        {"name": "Utility Knife", "location": "Under Desk 2"},
+    ]
+
+    for user in test_users:
+        add_user(user["username"], user["password"])
+
+    for tool in test_tools:
+        add_tool(tool["name"], tool["location"])
+
+    print("Test data added: 3 users and 10 tools.")
 
 def run_console():
     try:
@@ -470,11 +547,15 @@ def run_console():
     except KeyboardInterrupt:
         shutdown_server()
 
+
+
 if __name__ == '__main__':
     def run_web_server():
         context = ('certs/certificate.pem', 'certs/key.pem')
         app.run(debug=True, ssl_context=context, host='0.0.0.0', port=5000,use_reloader=False)
     
+    logs()
+
     web_thread = threading.Thread(target=run_web_server)
     web_thread.start()
 
