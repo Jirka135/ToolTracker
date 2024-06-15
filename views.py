@@ -54,15 +54,21 @@ def lend():
         return redirect(url_for('views.login'))
     
     if request.method == 'POST':
+        tool_id = None
         if 'tool_id' in request.form:
             tool_id = request.form['tool_id']
         elif 'qr_data' in request.form:
             qr_data = request.form['qr_data']
-            tool = Tool.query.filter_by(name=qr_data).first()
-            if tool:
-                tool_id = tool.id
-            else:
-                flash('Tool not found', 'danger')
+            try:
+                _, tool_name, _ = qr_data.split(':')
+                tool = Tool.query.filter_by(name=tool_name).first()
+                if tool:
+                    tool_id = tool.id
+                else:
+                    flash('Tool not found', 'danger')
+                    return redirect(url_for('views.lend'))
+            except ValueError:
+                flash('Invalid QR code format', 'danger')
                 return redirect(url_for('views.lend'))
         else:
             flash('Invalid request', 'danger')
@@ -95,13 +101,17 @@ def return_tool():
         tool_id = request.form.get('tool_id')
         qr_data = request.form.get('qr_data')
 
+        tool = None
         if tool_id:
             tool = Tool.query.get(tool_id)
         elif qr_data:
-            tool = Tool.query.filter_by(name=qr_data).first()
-        else:
-            tool = None
-
+            try:
+                _, tool_name, _ = qr_data.split(':')
+                tool = Tool.query.filter_by(name=tool_name).first()
+            except ValueError:
+                flash('Invalid QR code format', 'danger')
+                return redirect(url_for('views.return_tool'))
+        
         if tool:
             transaction = Transaction.query.filter_by(tool_id=tool.id, return_date=None).first()
             if transaction:
