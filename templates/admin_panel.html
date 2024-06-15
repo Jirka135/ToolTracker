@@ -84,7 +84,7 @@
         <a href="{{ url_for('admin.download_logs') }}" class="btn btn-primary mt-3">Download Logs</a>
         <ul class="list-group mt-3">
             {% for log in logs %}
-            <li class="list-group-item">{{ log.timestamp }} - User {{ log.user.username }} - Tool {{ log.tool.name }} - Action: {{ log.action }} - Details: {{ log.details }}</li>
+            <li class="list-group-item">{{ log.timestamp }} - User {{ log.user }} - Tool {{ log.tool }} - Action: {{ log.action }} - Details: {{ log.details }}</li>
             {% endfor %}
         </ul>
     </div>

@@ -15,6 +15,8 @@ def utility_processor():
 
 @admin_bp.route('/admin_panel')
 def admin_panel():
+    tools = Tool.query.all()
+    users = User.query.all()
     logs = ToolLog.query.order_by(ToolLog.timestamp.desc()).all()
 
     formatted_logs = []
@@ -27,7 +29,7 @@ def admin_panel():
             'details': log.details if log.details else "None"
         })
 
-    return render_template('admin_panel.html', logs=formatted_logs)
+    return render_template('admin_panel.html', tools=tools, users=users, logs=formatted_logs)
 
 @admin_bp.route('/add_tool', methods=['POST'])
 def admin_add_tool():
@@ -134,7 +136,7 @@ def download_logs():
         log_lines.append(f"{timestamp} - {user} - {tool} - Action: {action} - Details: {details}")
 
     log_content = "\n".join(log_lines)
-    
+
     buffer = io.BytesIO()
     buffer.write(log_content.encode('utf-8'))
     buffer.seek(0)

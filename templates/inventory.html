@@ -4,7 +4,8 @@
 
 {% block content %}
     <h1 class="mt-5">Inventory</h1>
-    <table class="table mt-3">
+    <input type="text" id="searchInventory" placeholder="Search for tools..." class="form-control mb-2">
+    <table class="table mt-3" id="inventoryTable">
         <thead>
             <tr>
                 <th>Name</th>
@@ -22,4 +23,21 @@
             {% endfor %}
         </tbody>
     </table>
+
+    <script>
+        document.getElementById('searchInventory').addEventListener('keyup', function() {
+            const searchValue = this.value.toLowerCase();
+            const rows = document.getElementById('inventoryTable').getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                const name = row.getElementsByTagName('td')[0].textContent.toLowerCase();
+                const location = row.getElementsByTagName('td')[1].textContent.toLowerCase();
+                if (name.includes(searchValue) || location.includes(searchValue)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+        });
+    </script>
 {% endblock %}

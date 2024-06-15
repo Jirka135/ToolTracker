@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Tool Tracker{% endblock %}</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <style>
         body {
             font-family: 'Open Sans', sans-serif;
@@ -38,6 +39,20 @@
             padding-top: 10px;
             padding-bottom: 10px;
         }
+
+        .select2-container .select2-selection--single {
+            height: 40px;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            line-height: 40px;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: 40px;
+        }
+        .select2-results__options {
+            max-height: 200px;
+            overflow-y: auto; 
+        }
     </style>
 </head>
 <body>
@@ -56,9 +71,10 @@
         {% endwith %}
         {% block content %}{% endblock %}
     </div>
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             var coll = document.getElementsByClassName("collapsible");
@@ -78,13 +94,16 @@
                 });
             }
 
-            // Automatically hide alerts after 10 seconds
             setTimeout(function() {
                 var alerts = document.querySelectorAll('.alert');
                 alerts.forEach(function(alert) {
                     alert.classList.remove('show');
                 });
             }, 10000);
+
+            $('.select2').select2({
+                width: '100%'
+            });
         });
     </script>
 </body>

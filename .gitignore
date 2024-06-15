@@ -163,3 +163,4 @@ cython_debug/
 certs/
 backups/
 static/
+qr_codes/

@@ -85,5 +85,4 @@ if __name__ == '__main__':
 
     web_thread = threading.Thread(target=run_web_server)
     web_thread.start()
-
     run_console(app)
