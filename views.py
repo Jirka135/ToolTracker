@@ -111,7 +111,6 @@ def return_tool():
         else:
             flash('Tool not found', 'danger')
 
-    # Fetch all transactions that are still active (not returned)
     transactions = db.session.query(Transaction, Tool).join(Tool).filter(Transaction.return_date.is_(None)).all()
     borrowed_tools = [tool for transaction, tool in transactions]
 

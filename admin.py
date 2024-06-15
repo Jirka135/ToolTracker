@@ -15,13 +15,20 @@ def utility_processor():
 
 @admin_bp.route('/admin_panel')
 def admin_panel():
-    if 'user_id' not in session or not is_admin(session['user_id']):
-        return redirect(url_for('views.login'))
-
-    tools = Tool.query.all()
-    users = User.query.all()
     logs = ToolLog.query.order_by(ToolLog.timestamp.desc()).all()
-    return render_template('admin_panel.html', tools=tools, users=users, logs=logs)
+
+    # Format timestamps for display
+    formatted_logs = []
+    for log in logs:
+        formatted_logs.append({
+            'timestamp': log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            'user': log.user.username,
+            'tool': log.tool.name,
+            'action': log.action,
+            'details': log.details if log.details else "None"
+        })
+
+    return render_template('admin_panel.html', logs=formatted_logs)
 
 @admin_bp.route('/add_tool', methods=['POST'])
 def admin_add_tool():

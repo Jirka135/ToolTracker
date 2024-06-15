@@ -13,7 +13,6 @@ import cv2
 from pyzbar.pyzbar import decode
 from flask import request
 
-
 def shutdown_server():
     func = request.environ.get('werkzeug.server.shutdown')
     if func is None:
@@ -21,18 +20,20 @@ def shutdown_server():
     func()
 
 def log_event(event_type, user, tool, duration=None):
-    log_message = f"{event_type}: User {user.username} ({user.id}) - Tool {tool.name} ({tool.id})"
-    if duration:
-        log_message += f" - Duration: {duration} days"
-    print(log_message)  # Print to console for immediate feedback
+    now = datetime.datetime.now(datetime.timezone.utc)
+    formatted_timestamp = now.strftime('%Y-%m-%d %H:%M:%S')
     
-    # Save to database
+    log_message = f"{formatted_timestamp} - {event_type}: User {user.username} ({user.id}) - Tool {tool.name} ({tool.id})"
+    if duration:
+        log_message += f" - Duration: {duration}"
+    print(log_message)
+
     log_entry = ToolLog(
         tool_id=tool.id,
         user_id=user.id,
         action=event_type,
-        details=f"Duration: {duration} days" if duration else None,
-        timestamp=datetime.datetime.now(datetime.timezone.utc)
+        details=f"Time Lended: {duration}" if duration else None,
+        timestamp=now
     )
     db.session.add(log_entry)
     db.session.commit()
@@ -41,7 +42,7 @@ def log_lend_tool(user_id, tool_id):
     user = User.query.get(user_id)
     tool = Tool.query.get(tool_id)
     if user and tool:
-        tool.rented_by = user.username  # Mark tool as rented
+        tool.rented_by = user.username
         db.session.commit()
         log_event("LEND", user, tool)
 
@@ -65,24 +66,29 @@ def log_return_tool(user_id, tool_id):
         return
     
     transaction = Transaction.query.filter_by(user_id=user_id, tool_id=tool_id, return_date=None).first()
-    print(f"Transaction return_date before update: {transaction.return_date if transaction else 'No transaction found'}")
     if transaction:
+        print(f"Transaction return_date before update: {transaction.return_date.strftime('%Y-%m-%d %H:%M:%S') if transaction.return_date else 'None'}")
         print(f"Found active transaction for user ID {user_id} and tool ID {tool_id}.")
-        print(f"Current return_date: {transaction.return_date}")
+        print(f"Current return_date: {transaction.return_date.strftime('%Y-%m-%d %H:%M:%S') if transaction.return_date else 'None'}")
 
-        # Convert borrow_date to timezone-aware if it's not
         if transaction.borrow_date.tzinfo is None:
             transaction.borrow_date = transaction.borrow_date.replace(tzinfo=datetime.timezone.utc)
 
-        duration = (datetime.datetime.now(datetime.timezone.utc) - transaction.borrow_date).days
+        duration_td = datetime.datetime.now(datetime.timezone.utc) - transaction.borrow_date
+        hours, remainder = divmod(duration_td.total_seconds(), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        duration_str = f"{int(hours)}h:{int(minutes)}m:{int(seconds)}s"
+        
         transaction.return_date = datetime.datetime.now(datetime.timezone.utc)
         tool.rented_by = None
         db.session.commit()
-        log_event("RETURN", user, tool, duration)
+        log_event("RETURN", user, tool, duration_str)
         print(f"Tool {tool.name} returned by {user.username}.")
-        print(f"Transaction return_date after update: {transaction.return_date}")
+        print(f"Transaction return_date after update: {transaction.return_date.strftime('%Y-%m-%d %H:%M:%S')}")
     else:
         print(f"No active transaction found for user ID {user_id} and tool ID {tool_id}.")
+
+
 
 def generate_qr_code(tool):
     security_token = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
@@ -236,7 +242,6 @@ def add_test_data():
     for user in test_users:
         add_user(user["username"], user["password"])
 
-    # Optionally, set some tools as rented for testing purposes
     rented_tools = [
         {"name": "Hammer", "location": "Drawer 1", "rented_by": "Alice"},
         {"name": "Screwdriver", "location": "Drawer 2", "rented_by": "Bob"},
