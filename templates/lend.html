@@ -30,7 +30,7 @@
         <canvas id="canvas" style="display:none;"></canvas>
         <div id="result" class="mt-3">No QR code detected yet.</div>
     </div>
-    <form method="POST" action="{{ url_for('lend') }}" id="qrForm" style="display:none;">
+    <form method="POST" action="{{ url_for('views.lend') }}" id="qrForm" style="display:none;">
         <input type="hidden" name="qr_data" id="qr_data">
         <button type="submit" class="btn btn-primary mt-3">Lend Tool via QR</button>
     </form>

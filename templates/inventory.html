@@ -9,6 +9,7 @@
             <tr>
                 <th>Name</th>
                 <th>Location</th>
+                <th>Status</th>
             </tr>
         </thead>
         <tbody>
@@ -16,6 +17,7 @@
             <tr>
                 <td>{{ tool.name }}</td>
                 <td>{{ tool.location }}</td>
+                <td>{{ 'Rented by ' ~ tool.rented_by if tool.rented_by else 'Free' }}</td>
             </tr>
             {% endfor %}
         </tbody>
