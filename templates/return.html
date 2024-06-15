@@ -35,73 +35,82 @@
         <button type="submit" class="btn btn-primary mt-3">Return Tool via QR</button>
     </form>
 
-    <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.min.js"></script>
+
     <script>
         $(document).ready(function() {
-            $('.select2').select2();
+            $('.select2').select2({
+                width: '100%'
+            });
         });
 
-        const scanBtn = document.getElementById('scanBtn');
-        const qrScannerDiv = document.getElementById('qrScanner');
-        const videoElem = document.getElementById('video');
-        const canvasElem = document.getElementById('canvas');
-        const resultElem = document.getElementById('result');
-        const qrForm = document.getElementById('qrForm');
-        const qrDataInput = document.getElementById('qr_data');
-        let videoStream;
+        document.addEventListener("DOMContentLoaded", function() {
+            const scanBtn = document.getElementById('scanBtn');
+            const qrScannerDiv = document.getElementById('qrScanner');
+            const videoElem = document.getElementById('video');
+            const canvasElem = document.getElementById('canvas');
+            const resultElem = document.getElementById('result');
+            const qrForm = document.getElementById('qrForm');
+            const qrDataInput = document.getElementById('qr_data');
+            let videoStream;
 
-        scanBtn.addEventListener('click', () => {
-            qrScannerDiv.style.display = 'block';
-            startScanner();
-        });
+            scanBtn.addEventListener('click', () => {
+                qrScannerDiv.style.display = 'block';
+                startScanner();
+            });
 
-        function startScanner() {
-            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-                    .then(stream => {
-                        videoElem.srcObject = stream;
-                        videoStream = stream;
-                        videoElem.play();
-                        requestAnimationFrame(scan);
-                    })
-                    .catch(error => {
-                        console.error('Error accessing camera:', error);
-                        alert(`Error accessing camera: ${error.message}`);
-                        resultElem.textContent = `Error accessing camera: ${error.message}`;
-                    });
-            } else {
-                console.error('getUserMedia not supported');
-                alert('getUserMedia not supported by this browser.');
-                resultElem.textContent = 'Error: getUserMedia not supported by this browser.';
-            }
-        }
-
-        function scan() {
-            if (videoElem.readyState === videoElem.HAVE_ENOUGH_DATA) {
-                const canvas = canvasElem.getContext('2d');
-                canvasElem.height = videoElem.videoHeight;
-                canvasElem.width = videoElem.videoWidth;
-                canvas.drawImage(videoElem, 0, 0, canvasElem.width, canvasElem.height);
-                const imageData = canvas.getImageData(0, 0, canvasElem.width, canvasElem.height);
-                const code = jsQR(imageData.data, imageData.width, imageData.height);
-
-                if (code) {
-                    console.log('Decoded QR code:', code.data);
-                    alert(`Decoded QR code: ${code.data}`);
-                    resultElem.textContent = `QR Code Result: ${code.data}`;
-                    qrDataInput.value = code.data;
-                    qrForm.style.display = 'block';
-                    stopScanner();
-                    return;
+            function startScanner() {
+                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+                        .then(stream => {
+                            videoElem.srcObject = stream;
+                            videoStream = stream;
+                            videoElem.play();
+                            requestAnimationFrame(scan);
+                        })
+                        .catch(error => {
+                            console.error('Error accessing camera:', error);
+                            alert(`Error accessing camera: ${error.message}`);
+                            resultElem.textContent = `Error accessing camera: ${error.message}`;
+                        });
                 } else {
-                    resultElem.textContent = 'No QR code detected yet.';
+                    console.error('getUserMedia not supported');
+                    alert('getUserMedia not supported by this browser.');
+                    resultElem.textContent = 'Error: getUserMedia not supported by this browser.';
                 }
             }
-            requestAnimationFrame(scan);
-        }
 
-        function stopScanner() {
-            videoStream.getTracks().forEach(track => track.stop());
-        }
+            function scan() {
+                if (videoElem.readyState === videoElem.HAVE_ENOUGH_DATA) {
+                    const canvas = canvasElem.getContext('2d');
+                    canvasElem.height = videoElem.videoHeight;
+                    canvasElem.width = videoElem.videoWidth;
+                    canvas.drawImage(videoElem, 0, 0, canvasElem.width, canvasElem.height);
+                    const imageData = canvas.getImageData(0, 0, canvasElem.width, canvasElem.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+                    if (code) {
+                        console.log('Decoded QR code:', code.data);
+                        alert(`Decoded QR code: ${code.data}`);
+                        resultElem.textContent = `QR Code Result: ${code.data}`;
+                        qrDataInput.value = code.data;
+                        qrForm.style.display = 'block';
+                        stopScanner();
+                        return;
+                    } else {
+                        resultElem.textContent = 'No QR code detected yet.';
+                    }
+                }
+                requestAnimationFrame(scan);
+            }
+
+            function stopScanner() {
+                if (videoStream) {
+                    videoStream.getTracks().forEach(track => track.stop());
+                }
+            }
+        });
     </script>
 {% endblock %}

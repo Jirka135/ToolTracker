@@ -85,6 +85,7 @@ def lend():
 
     return render_template('lend.html', tools=available_tools, borrowed_tools=borrowed_tools)
 
+
 @views_bp.route('/return', methods=['GET', 'POST'])
 def return_tool():
     if 'user_id' not in session:
