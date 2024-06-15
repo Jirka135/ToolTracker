@@ -1,7 +1,7 @@
-Flask
-Flask-SQLAlchemy
-qrcode[pil]
-opencv-python-headless
-pyzbar
-Werkzeug
-waitress
+Flask==2.3.2
+Flask-SQLAlchemy==3.0.3
+Werkzeug==2.3.6
+qrcode==7.4.2
+opencv-python-headless==4.7.0.72
+pyzbar==0.1.9
+requests==2.31.0
