@@ -14,7 +14,6 @@ def create_app():
     with app.app_context():
         db.create_all()
 
-    # Register Blueprints
     app.register_blueprint(views.views_bp)
     app.register_blueprint(admin.admin_bp)
 

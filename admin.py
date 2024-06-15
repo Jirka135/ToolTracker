@@ -17,7 +17,6 @@ def utility_processor():
 def admin_panel():
     logs = ToolLog.query.order_by(ToolLog.timestamp.desc()).all()
 
-    # Format timestamps for display
     formatted_logs = []
     for log in logs:
         formatted_logs.append({
@@ -118,11 +117,26 @@ def admin_live_logs():
     except Exception as e:
         return str(e), 500
 
-@admin_bp.route('/download_logs', methods=['POST'])
-def admin_download_logs():
-    log_file_path = 'instance/app.log'
-    if os.path.exists(log_file_path):
-        return send_file(log_file_path, as_attachment=True)
-    else:
-        flash('Log file not found', 'danger')
-        return redirect(url_for('admin.admin_panel'))
+from flask import send_file
+import io
+
+@admin_bp.route('/download_logs')
+def download_logs():
+    logs = ToolLog.query.order_by(ToolLog.timestamp.desc()).all()
+
+    log_lines = []
+    for log in logs:
+        timestamp = log.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+        user = log.user.username
+        tool = log.tool.name
+        action = log.action
+        details = log.details if log.details else "None"
+        log_lines.append(f"{timestamp} - {user} - {tool} - Action: {action} - Details: {details}")
+
+    log_content = "\n".join(log_lines)
+    
+    buffer = io.BytesIO()
+    buffer.write(log_content.encode('utf-8'))
+    buffer.seek(0)
+
+    return send_file(buffer, as_attachment=True, download_name='logs.txt', mimetype='text/plain')

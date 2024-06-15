@@ -55,10 +55,10 @@ def run_console(app):
                 elif choice == '11':
                     utils.regenerate_qr_codes()
                 elif choice == '12':
-                    utils.backup_database(app)  # Pass the app instance here
+                    utils.backup_database(app)
                 elif choice == '13':
                     backup_file = input("Enter the backup file path: ")
-                    utils.restore_database(app, backup_file)  # Pass the app instance here
+                    utils.restore_database(app, backup_file)
                 elif choice == '14':
                     username = input("Enter admin username: ")
                     password = input("Enter admin password: ")
