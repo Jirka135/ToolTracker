@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Live Logs{% endblock %}
+
+{% block content %}
+    <h1 class="mt-5">Live Logs</h1>
+    <table class="table mt-3">
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>User</th>
+                <th>Tool</th>
+                <th>Action</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                <td>{{ log.username }}</td>
+                <td>{{ log.tool_name }}</td>
+                <td>{{ log.action }}</td>
+                <td>{{ log.details }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

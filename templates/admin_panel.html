@@ -3,89 +3,14 @@
 {% block title %}Admin Panel{% endblock %}
 
 {% block content %}
-    <h1 class="mt-5">Admin Panel</h1>
-
-    <button class="collapsible">Add Tool</button>
-    <div class="content">
-        <form method="POST" action="{{ url_for('admin.admin_add_tool') }}">
-            <div class="form-group">
-                <label for="tool_name">Tool Name:</label>
-                <input type="text" id="tool_name" name="tool_name" class="form-control" required>
-            </div>
-            <div class="form-group">
-                <label for="tool_location">Tool Location:</label>
-                <input type="text" id="tool_location" name="tool_location" class="form-control" required>
-            </div>
-            <button type="submit" class="btn btn-primary">Add Tool</button>
-        </form>
-    </div>
-
-    <button class="collapsible">Remove Tool</button>
-    <div class="content">
-        <form method="POST" action="{{ url_for('admin.admin_remove_tool') }}">
-            <div class="form-group">
-                <label for="remove_tool_id">Tool ID to Remove:</label>
-                <input type="number" id="remove_tool_id" name="tool_id" class="form-control" required>
-            </div>
-            <button type="submit" class="btn btn-danger">Remove Tool</button>
-        </form>
-    </div>
-
-    <button class="collapsible">List of Tools</button>
-    <div class="content">
-        <ul class="list-group mt-3">
-            {% for tool in tools %}
-            <li class="list-group-item">
-                ID: {{ tool.id }}, Name: {{ tool.name }}, Location: {{ tool.location }}
-            </li>
-            {% endfor %}
-        </ul>
-    </div>
-
-    <button class="collapsible">Add User</button>
-    <div class="content">
-        <form method="POST" action="{{ url_for('admin.admin_add_user') }}">
-            <div class="form-group">
-                <label for="username">Username:</label>
-                <input type="text" id="username" name="username" class="form-control" required>
-            </div>
-            <div class="form-group">
-                <label for="password">Password:</label>
-                <input type="password" id="password" name="password" class="form-control" required>
-            </div>
-            <button type="submit" class="btn btn-primary">Add User</button>
-        </form>
-    </div>
-
-    <button class="collapsible">Remove User</button>
-    <div class="content">
-        <form method="POST" action="{{ url_for('admin.admin_remove_user') }}">
-            <div class="form-group">
-                <label for="remove_user_id">User ID to Remove:</label>
-                <input type="number" id="remove_user_id" name="user_id" class="form-control" required>
-            </div>
-            <button type="submit" class="btn btn-danger">Remove User</button>
-        </form>
-    </div>
-
-    <button class="collapsible">List of Users</button>
-    <div class="content">
-        <ul class="list-group mt-3">
-            {% for user in users %}
-            <li class="list-group-item">
-                ID: {{ user.id }}, Username: {{ user.username }}, Admin: {{ 'Yes' if user.is_admin else 'No' }}
-            </li>
-            {% endfor %}
-        </ul>
-    </div>
-
-    <button class="collapsible">Logs</button>
-    <div class="content">
-        <a href="{{ url_for('admin.download_logs') }}" class="btn btn-primary mt-3">Download Logs</a>
-        <ul class="list-group mt-3">
-            {% for log in logs %}
-            <li class="list-group-item">{{ log.timestamp }} - User {{ log.user }} - Tool {{ log.tool }} - Action: {{ log.action }} - Details: {{ log.details }}</li>
-            {% endfor %}
-        </ul>
+    <div class="container mt-5">
+        <h1>Admin Panel</h1>
+        <div class="list-group">
+            <a href="{{ url_for('admin.manage_tools') }}" class="list-group-item list-group-item-action">Manage Tools</a>
+            <a href="{{ url_for('admin.manage_users') }}" class="list-group-item list-group-item-action">Manage Users</a>
+            <a href="{{ url_for('admin.database_management') }}" class="list-group-item list-group-item-action">Database Management</a>
+            <a href="{{ url_for('admin.logs') }}" class="list-group-item list-group-item-action">Logs</a>
+            <a href="{{ url_for('admin.qr_codes') }}" class="list-group-item list-group-item-action">QR Codes</a>
+        </div>
     </div>
 {% endblock %}

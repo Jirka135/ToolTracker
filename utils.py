@@ -22,15 +22,15 @@ def shutdown_server():
 def log_event(event_type, user, tool, duration=None):
     now = datetime.datetime.now(datetime.timezone.utc)
     formatted_timestamp = now.strftime('%Y-%m-%d %H:%M:%S')
-    
+
     log_message = f"{formatted_timestamp} - {event_type}: User {user.username} ({user.id}) - Tool {tool.name} ({tool.id})"
     if duration:
         log_message += f" - Duration: {duration}"
-    print(log_message)
+    print(log_message)  # Print to console for immediate feedback
 
     log_entry = ToolLog(
-        tool_id=tool.id,
-        user_id=user.id,
+        tool_name=tool.name,
+        username=user.username,
         action=event_type,
         details=f"Time Lended: {duration}" if duration else None,
         timestamp=now
@@ -189,6 +189,20 @@ def list_users():
     for user in users:
         print(f"User ID: {user.id}, Username: {user.username}")
 
+def remove_tools(tool_ids):
+    for tool_id in tool_ids:
+        tool = Tool.query.get(tool_id)
+        if tool:
+            db.session.delete(tool)
+    db.session.commit()
+
+def remove_users(user_ids):
+    for user_id in user_ids:
+        user = User.query.get(user_id)
+        if user:
+            db.session.delete(user)
+    db.session.commit()
+
 def backup_database(app):
     backup_dir = 'backups'
     os.makedirs(backup_dir, exist_ok=True)
@@ -208,7 +222,7 @@ def restore_database(app, backup_file):
     conn.commit()
     print(f"Database restored from {backup_file}")
 
-def download_qr_codes():
+def generate_qr_codes_zip():
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
         tools = Tool.query.all()
@@ -217,7 +231,7 @@ def download_qr_codes():
             if os.path.exists(qr_code_path):
                 zip_file.write(qr_code_path, os.path.basename(qr_code_path))
     zip_buffer.seek(0)
-    return send_file(zip_buffer, mimetype='application/zip', as_attachment=True, download_name='qr_codes.zip')
+    return zip_buffer
 
 def add_test_data():
     test_users = [

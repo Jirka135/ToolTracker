@@ -32,11 +32,8 @@ class Transaction(db.Model):
 
 class ToolLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    tool_id = db.Column(db.Integer, db.ForeignKey('tool.id'), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    tool_name = db.Column(db.String(100), nullable=False)
+    username = db.Column(db.String(100), nullable=False)
     action = db.Column(db.String(50), nullable=False)
     timestamp = db.Column(db.DateTime, nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     details = db.Column(db.Text, nullable=True)
-    
-    tool = db.relationship('Tool', backref=db.backref('logs', lazy=True))
-    user = db.relationship('User', backref=db.backref('logs', lazy=True))

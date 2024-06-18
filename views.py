@@ -54,36 +54,18 @@ def lend():
         return redirect(url_for('views.login'))
     
     if request.method == 'POST':
-        tool_id = None
-        if 'tool_id' in request.form:
-            tool_id = request.form['tool_id']
-        elif 'qr_data' in request.form:
-            qr_data = request.form['qr_data']
-            try:
-                _, tool_name, _ = qr_data.split(':')
-                tool = Tool.query.filter_by(name=tool_name).first()
-                if tool:
-                    tool_id = tool.id
-                else:
-                    flash('Tool not found', 'danger')
-                    return redirect(url_for('views.lend'))
-            except ValueError:
-                flash('Invalid QR code format', 'danger')
-                return redirect(url_for('views.lend'))
-        else:
-            flash('Invalid request', 'danger')
-            return redirect(url_for('views.lend'))
-        
+        tool_ids = request.form.getlist('tool_ids')
         user_id = session['user_id']
-        active_transaction = Transaction.query.filter_by(tool_id=tool_id, return_date=None).first()
-        if active_transaction:
-            flash('Tool is already lent out', 'danger')
-        else:
-            transaction = Transaction(user_id=user_id, tool_id=tool_id, borrow_date=datetime.datetime.now(datetime.timezone.utc))
-            db.session.add(transaction)
-            db.session.commit()
-            log_lend_tool(user_id, tool_id)
-            flash('Tool lent successfully', 'success')
+        for tool_id in tool_ids:
+            active_transaction = Transaction.query.filter_by(tool_id=tool_id, return_date=None).first()
+            if active_transaction:
+                flash(f'Tool {Tool.query.get(tool_id).name} is already lent out', 'danger')
+            else:
+                transaction = Transaction(user_id=user_id, tool_id=tool_id, borrow_date=datetime.datetime.now(datetime.timezone.utc))
+                db.session.add(transaction)
+                db.session.commit()
+                log_lend_tool(user_id, tool_id)
+                flash(f'Tool {Tool.query.get(tool_id).name} lent successfully', 'success')
 
     lent_out_tools = db.session.query(Transaction.tool_id).filter(Transaction.return_date.is_(None)).subquery()
     available_tools = Tool.query.filter(Tool.id.not_in(lent_out_tools.select())).all()
@@ -91,36 +73,24 @@ def lend():
 
     return render_template('lend.html', tools=available_tools, borrowed_tools=borrowed_tools)
 
-
 @views_bp.route('/return', methods=['GET', 'POST'])
 def return_tool():
     if 'user_id' not in session:
         return redirect(url_for('views.login'))
 
     if request.method == 'POST':
-        tool_id = request.form.get('tool_id')
-        qr_data = request.form.get('qr_data')
-
-        tool = None
-        if tool_id:
+        tool_ids = request.form.getlist('tool_ids')
+        for tool_id in tool_ids:
             tool = Tool.query.get(tool_id)
-        elif qr_data:
-            try:
-                _, tool_name, _ = qr_data.split(':')
-                tool = Tool.query.filter_by(name=tool_name).first()
-            except ValueError:
-                flash('Invalid QR code format', 'danger')
-                return redirect(url_for('views.return_tool'))
-        
-        if tool:
-            transaction = Transaction.query.filter_by(tool_id=tool.id, return_date=None).first()
-            if transaction:
-                log_return_tool(transaction.user_id, tool.id)
-                flash('Tool returned successfully', 'success')
+            if tool:
+                transaction = Transaction.query.filter_by(tool_id=tool.id, return_date=None).first()
+                if transaction:
+                    log_return_tool(transaction.user_id, tool.id)
+                    flash(f'Tool {tool.name} returned successfully', 'success')
+                else:
+                    flash(f'No active lending record found for tool {tool.name}', 'danger')
             else:
-                flash('No active lending record found for this tool', 'danger')
-        else:
-            flash('Tool not found', 'danger')
+                flash('Tool not found', 'danger')
 
     transactions = db.session.query(Transaction, Tool).join(Tool).filter(Transaction.return_date.is_(None)).all()
     borrowed_tools = [tool for transaction, tool in transactions]

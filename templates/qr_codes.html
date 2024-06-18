@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}QR Codes{% endblock %}
+
+{% block content %}
+    <h1 class="mt-5">QR Codes</h1>
+
+    <h2 class="mt-3">Download QR Codes</h2>
+    <form method="POST" action="{{ url_for('admin.admin_download_qr_codes') }}">
+        <button type="submit" class="btn btn-primary">Download QR Codes</button>
+    </form>
+
+    <h2 class="mt-5">Regenerate QR Codes</h2>
+    <form method="POST" action="{{ url_for('admin.admin_regenerate_qr_codes') }}">
+        <button type="submit" class="btn btn-primary">Regenerate QR Codes</button>
+    </form>
+{% endblock %}
