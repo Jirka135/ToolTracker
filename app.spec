@@ -8,7 +8,6 @@ a = Analysis(
         ('templates', 'templates'),  # Ensure you have your templates directory added
         ('C:\\Users\\Jirka\\anaconda3\\envs\\tooltracker\\Lib\\site-packages\\pyzbar\\libiconv.dll', '.'),  # Corrected line
         ('C:\\Users\\Jirka\\anaconda3\\envs\\tooltracker\\Lib\\site-packages\\pyzbar\\libzbar-64.dll', '.'),  # Add the path to your libzbar-64.dll file
-        ('static', 'static'),  # Add the static directory if you have one for QR codes and other static files
     ],
     hiddenimports=['pysqlite2', 'MySQLdb', 'psycopg2'],
     hookspath=[],
