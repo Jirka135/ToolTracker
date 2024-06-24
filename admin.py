@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, flash, redirect, url_for, send_file, session
+from flask import Blueprint, render_template, request, flash, redirect, url_for, send_file, session,current_app
 from models import db, Tool, User, ToolLog
 import os
 from utils import (add_tool, remove_tools, add_user, remove_users, is_admin, backup_database, 
@@ -117,7 +117,7 @@ def admin_restore_database():
         flash('Admin access required', 'danger')
         return redirect(url_for('views.login'))
     
-    backup_dir = os.path.join('backups')
+    backup_dir = current_app.config['BACKUPS_PATH']
     backups = sorted(os.listdir(backup_dir), reverse=True)
     if backups:
         latest_backup = os.path.join(backup_dir, backups[0])

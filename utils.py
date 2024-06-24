@@ -11,7 +11,7 @@ from models import db, Tool, User, Transaction, ToolLog
 import sqlite3
 import cv2
 from pyzbar.pyzbar import decode
-from flask import request
+from flask import request,current_app
 
 def shutdown_server():
     func = request.environ.get('werkzeug.server.shutdown')
@@ -104,7 +104,7 @@ def generate_qr_code(tool):
     qr.make(fit=True)
     img = qr.make_image(fill='black', back_color='white')
     
-    qr_code_dir = os.path.join('static', 'qr_codes')
+    qr_code_dir = current_app.config['QR_CODES_PATH']
     os.makedirs(qr_code_dir, exist_ok=True)
     
     qr_code_filename = f"{tool.name}_{tool.id}_{tool.location.replace(' ', '_')}_QRcode.png"

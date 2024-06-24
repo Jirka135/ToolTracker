@@ -1,10 +1,10 @@
-from config import create_app
+from config import create_app,get_self_ip
 import utils
-import views
-import admin
+import time
 import threading
 import os
 import logging
+
 
 def run_console(app):
     try:
@@ -24,7 +24,7 @@ def run_console(app):
                 print("13. Restore Database")
                 print("14. Add Admin")
                 print("15. Exit")
-                print("16. reset items")
+                print("16. Reset Items")
                 choice = input("Enter your choice: ")
 
                 if choice == '1':
@@ -47,7 +47,7 @@ def run_console(app):
                     utils.list_users()
                 elif choice == '7':
                     filename = input("Enter QR code filename: ")
-                    file_path = os.path.join('static', 'qr_codes', filename)
+                    file_path = os.path.join(app.config['QR_CODES_PATH'], filename)
                     print(f"Reading QR code from: {file_path}")
                     utils.identify_tool_from_qr_code(file_path)
                 elif choice == '10':
@@ -58,7 +58,8 @@ def run_console(app):
                     utils.backup_database(app)
                 elif choice == '13':
                     backup_file = input("Enter the backup file path: ")
-                    utils.restore_database(app, backup_file)
+                    backup_file_path = os.path.join(app.config['BACKUPS_PATH'], backup_file)
+                    utils.restore_database(app, backup_file_path)
                 elif choice == '14':
                     username = input("Enter admin username: ")
                     password = input("Enter admin password: ")
@@ -75,14 +76,23 @@ def run_console(app):
 
 if __name__ == '__main__':
     app = create_app()
-
+    get_self_ip()
+    print("   ")
     def run_web_server():
         log = logging.getLogger('werkzeug')
         log.setLevel(logging.ERROR)
 
-        context = ('certs/certificate.pem', 'certs/key.pem')
-        app.run(debug=True, ssl_context=context, host='0.0.0.0', port=5000, use_reloader=False)
+        try:
+            context = (os.path.join(app.config['CERTS_PATH'], 'certificate.pem'),
+                       os.path.join(app.config['CERTS_PATH'], 'key.pem'))
+            app.run(debug=True, ssl_context=context, host='0.0.0.0', port=5000, use_reloader=False)
+        except RuntimeError as e:
+            if 'SSL is unavailable' in str(e):
+                print("   ")
+            else:
+                raise
 
     web_thread = threading.Thread(target=run_web_server)
     web_thread.start()
+    time.sleep(1)
     run_console(app)

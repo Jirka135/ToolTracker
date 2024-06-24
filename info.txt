@@ -1,0 +1,3 @@
+to create exe
+
+pyinstaller app.spec
